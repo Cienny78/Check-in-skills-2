@@ -152,8 +152,7 @@
       const formData = new FormData(form);
       formData.append('tijd', new Date().toLocaleString());
 
-      fetch("https://script.google.com/macros/s/AKfycbxENN7nF7e3uwXsmV3QKKq_MN3LwvKnh68TREBKxgmVuXpWlgxJMTtf35pfEfvHBznG/exec", {
-        method: "POST",
+fetch("https://script.google.com/macros/s/AKfycbxEbGbyBtFYqIRO0Il59tXnXNv5o6rok89w27JBgQvh4loggjhX9Uh1_Ty_K32wXJUB/exec", {        method: "POST",
         body: formData
       })
       .then(response => response.text())
