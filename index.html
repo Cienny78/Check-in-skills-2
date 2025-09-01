@@ -20,11 +20,9 @@
     .error { background-color: #f8d7da; color: #721c24; }
     .info { background-color: #cce5ff; color: #004085; }
 
-    /* Toegevoegd: lichte knop-/spinner-styling voor de INCHECK-knop */
+    /* — alleen styling voor de incheck-knop en spinner — */
     :root{
-      --btn: #007bff;
-      --btn-disabled: #a0a0a0;
-      --btn-ok: #28a745;
+      --btn: #007bff; --btn-disabled: #a0a0a0; --btn-ok: #28a745;
     }
     .btn { background: var(--btn); color: #fff; border: none; padding: 12px 14px; border-radius: 8px; cursor: pointer; }
     .btn:disabled { background: var(--btn-disabled); cursor: not-allowed; opacity: 0.9; }
@@ -35,7 +33,7 @@
   </style>
 </head>
 <body>
-  <h2>Check-in Skills of Pl|s</h2>
+  <h2>Check-in Skills of Pl|s2 </h2>
   <div id="melding"></div>
   <p>Ben je op school? Klik op de knop hieronder om te kijken of je op de juiste locatie bent om in te checken :-).</p>
   <button onclick="checkLocation()">📍 Check mijn locatie</button>
@@ -54,7 +52,7 @@
       <input type="email" id="email" name="email" required>
       <input type="hidden" id="lat" name="lat">
       <input type="hidden" id="lng" name="lng">
-      <!-- Toegevoegd: id en knopstijl voor laad/disable-gedrag -->
+      <!-- alleen id + class toegevoegd voor de knop -->
       <button id="submitButton" type="submit" class="btn">✅ Inchecken</button>
     </form>
   </div>
@@ -151,30 +149,24 @@
       document.getElementById('retryButton').style.display = 'none';
     }
 
-    /* Toegevoegd: helpers en state voor de INCHECK-knop */
+    /* — mini helpers voor de submitknop — */
     let isVersturenBezig = false;
-
-    function setLoading(btn, textWhileLoading) {
+    function setLoading(btn, txt) {
       if (!btn) return;
       btn.dataset.originalText = btn.dataset.originalText || btn.innerHTML;
       btn.disabled = true;
-      btn.innerHTML = `<span class="loading-text"><span class="spinner" aria-hidden="true"></span>${textWhileLoading}</span>`;
+      btn.innerHTML = `<span class="loading-text"><span class="spinner" aria-hidden="true"></span>${txt}</span>`;
     }
-    function clearLoading(btn, restoreText = true) {
+    function clearLoading(btn) {
       if (!btn) return;
       btn.disabled = false;
-      if (restoreText && btn.dataset.originalText) {
-        btn.innerHTML = btn.dataset.originalText;
-      }
+      if (btn.dataset.originalText) btn.innerHTML = btn.dataset.originalText;
     }
-    function setSuccess(btn, text = "✅ Ingecheckt") {
+    function setSuccess(btn, txt) {
       if (!btn) return;
       btn.classList.add('btn-ok');
       btn.disabled = true;
-      btn.innerHTML = text;
-    }
-    function disableForm(form, on) {
-      [...form.elements].forEach(el => el.disabled = on);
+      btn.innerHTML = txt;
     }
 
     function verzenden(event) {
@@ -192,27 +184,20 @@
       const form = event.target;
       const submitBtn = document.getElementById('submitButton');
 
-      /* BELANGRIJK: eerst de FormData maken (velden nog NIET disabled) */
+      // — net als in je originele code: EERST de FormData maken —
       const formData = new FormData(form);
       formData.append('tijd', new Date().toLocaleString());
 
-      /* Dan pas UI in laad-stand en formulier tijdelijk uitschakelen */
+      // — alleen de knop “busy” zetten (formuliervelden blijven actief) —
       isVersturenBezig = true;
       setLoading(submitBtn, "Bezig met inchecken…");
-      disableForm(form, true);
-
-      // Optionele timeout (20s) voor Apps Script
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000);
 
       fetch("https://script.google.com/macros/s/AKfycbxEbGbyBtFYqIRO0Il59tXnXNv5o6rok89w27JBgQvh4loggjhX9Uh1_Ty_K32wXJUB/exec", {
         method: "POST",
-        body: formData,
-        signal: controller.signal
+        body: formData
       })
       .then(response => response.text())
       .then(text => {
-        console.log("Server antwoord:", text);
         if (text === "OK") {
           toonMelding("✅ Je bent ingecheckt. Dankjewel!", "success");
           localStorage.setItem("checkin_datum_skills_saskia", vandaag);
@@ -223,24 +208,16 @@
         } else if (text === "AL_GEDAAN_VANDAAG") {
           toonMelding("⏳ Je hebt vandaag al ingecheckt (volgens het systeem).", "info");
           clearLoading(submitBtn);
-          disableForm(form, false);
+          isVersturenBezig = false;
         } else {
           toonMelding("❌ Oei! Het opslaan ging mis.", "error");
           clearLoading(submitBtn);
-          disableForm(form, false);
+          isVersturenBezig = false;
         }
       })
       .catch(error => {
-        const msg = (error.name === 'AbortError')
-          ? "⏱️ Het duurt te lang. Controleer je internet en probeer opnieuw."
-          : "❌ Foutje bij het versturen: " + error.message;
-        toonMelding(msg, "error");
+        toonMelding("❌ Foutje bij het versturen: " + error.message, "error");
         clearLoading(submitBtn);
-        disableForm(form, false);
-      })
-      .finally(() => {
-        clearTimeout(timeoutId);
-        // Bij succes blijft de knop disabled met “Ingecheckt”.
         isVersturenBezig = false;
       });
     }
