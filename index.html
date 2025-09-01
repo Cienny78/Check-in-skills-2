@@ -19,10 +19,23 @@
     .success { background-color: #d4edda; color: #155724; }
     .error { background-color: #f8d7da; color: #721c24; }
     .info { background-color: #cce5ff; color: #004085; }
+
+    /* --- Toegevoegd: lichte knop- en spinner-styling voor de submitknop --- */
+    :root{
+      --btn: #007bff;
+      --btn-disabled: #a0a0a0;
+      --btn-ok: #28a745;
+    }
+    .btn { background: var(--btn); color: #fff; border: none; padding: 12px 14px; border-radius: 8px; cursor: pointer; }
+    .btn:disabled { background: var(--btn-disabled); cursor: not-allowed; opacity: 0.9; }
+    .btn-ok { background: var(--btn-ok); }
+    .loading-text { display: inline-flex; align-items: center; gap: 8px; }
+    .spinner { width: 1em; height: 1em; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 0.9s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
-  <h2>Check-in Skills of Pl|s</h2>
+  <h2>Check-in Skills of PL|s</h2>
   <div id="melding"></div>
   <p>Ben je op school? Klik op de knop hieronder om te kijken of je op de juiste locatie bent om in te checken :-).</p>
   <button onclick="checkLocation()">📍 Check mijn locatie</button>
@@ -41,7 +54,8 @@
       <input type="email" id="email" name="email" required>
       <input type="hidden" id="lat" name="lat">
       <input type="hidden" id="lng" name="lng">
-      <button type="submit">✅ Inchecken</button>
+      <!-- Toegevoegd: id en knopstijl voor laad/disable-gedrag -->
+      <button id="submitButton" type="submit" class="btn">✅ Inchecken</button>
     </form>
   </div>
 
@@ -137,8 +151,36 @@
       document.getElementById('retryButton').style.display = 'none';
     }
 
+    /* ----------------- Toegevoegd: alleen voor de INCHECK-knop ----------------- */
+    let isVersturenBezig = false;
+
+    function setLoading(btn, textWhileLoading) {
+      if (!btn) return;
+      btn.dataset.originalText = btn.dataset.originalText || btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = `<span class="loading-text"><span class="spinner" aria-hidden="true"></span>${textWhileLoading}</span>`;
+    }
+    function clearLoading(btn, restoreText = true) {
+      if (!btn) return;
+      btn.disabled = false;
+      if (restoreText && btn.dataset.originalText) {
+        btn.innerHTML = btn.dataset.originalText;
+      }
+    }
+    function setSuccess(btn, text = "✅ Ingecheckt") {
+      if (!btn) return;
+      btn.classList.add('btn-ok');
+      btn.disabled = true;
+      btn.innerHTML = text;
+    }
+    function disableForm(form, on) {
+      [...form.elements].forEach(el => el.disabled = on);
+    }
+    /* -------------------------------------------------------------------------- */
+
     function verzenden(event) {
       event.preventDefault();
+      if (isVersturenBezig) return; // anti-dubbelklik
 
       const vandaag = new Date().toISOString().split("T")[0];
       const laatstIngecheckt = localStorage.getItem("checkin_datum_skills_saskia");
@@ -149,11 +191,24 @@
       }
 
       const form = event.target;
+      const submitBtn = document.getElementById('submitButton');
+
+      // UI in laad-stand
+      isVersturenBezig = true;
+      setLoading(submitBtn, "Bezig met inchecken…");
+      disableForm(form, true);
+
       const formData = new FormData(form);
       formData.append('tijd', new Date().toLocaleString());
 
-fetch("https://script.google.com/macros/s/AKfycbxEbGbyBtFYqIRO0Il59tXnXNv5o6rok89w27JBgQvh4loggjhX9Uh1_Ty_K32wXJUB/exec", {        method: "POST",
-        body: formData
+      // Optionele timeout: 10s
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      fetch("https://script.google.com/macros/s/AKfycbxEbGbyBtFYqIRO0Il59tXnXNv5o6rok89w27JBgQvh4loggjhX9Uh1_Ty_K32wXJUB/exec", {
+        method: "POST",
+        body: formData,
+        signal: controller.signal
       })
       .then(response => response.text())
       .then(text => {
@@ -163,16 +218,32 @@ fetch("https://script.google.com/macros/s/AKfycbxEbGbyBtFYqIRO0Il59tXnXNv5o6rok8
           form.reset();
           document.getElementById("formulier").style.display = "none";
           document.getElementById("status").textContent = "";
+          setSuccess(submitBtn, "✅ Ingecheckt");
         } else if (text === "AL_GEDAAN_VANDAAG") {
           toonMelding("⏳ Je hebt vandaag al ingecheckt (volgens het systeem).", "info");
+          clearLoading(submitBtn);
+          disableForm(form, false);
         } else {
           toonMelding("❌ Oei! Het opslaan ging mis.", "error");
+          clearLoading(submitBtn);
+          disableForm(form, false);
         }
       })
       .catch(error => {
-        toonMelding("❌ Foutje bij het versturen: " + error.message, "error");
+        const msg = (error.name === 'AbortError')
+          ? "⏱️ Het duurt te lang. Controleer je internet en probeer opnieuw."
+          : "❌ Foutje bij het versturen: " + error.message;
+        toonMelding(msg, "error");
+        clearLoading(submitBtn);
+        disableForm(form, false);
+      })
+      .finally(() => {
+        clearTimeout(timeoutId);
+        // Bij succes blijft de knop disabled met “Ingecheckt”.
+        isVersturenBezig = false;
       });
     }
   </script>
 </body>
 </html>
+
