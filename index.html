@@ -20,7 +20,7 @@
     .error { background-color: #f8d7da; color: #721c24; }
     .info { background-color: #cce5ff; color: #004085; }
 
-    /* --- Toegevoegd: lichte knop- en spinner-styling voor de submitknop --- */
+    /* Toegevoegd: lichte knop-/spinner-styling voor de INCHECK-knop */
     :root{
       --btn: #007bff;
       --btn-disabled: #a0a0a0;
@@ -151,7 +151,7 @@
       document.getElementById('retryButton').style.display = 'none';
     }
 
-    /* ----------------- Toegevoegd: alleen voor de INCHECK-knop ----------------- */
+    /* Toegevoegd: helpers en state voor de INCHECK-knop */
     let isVersturenBezig = false;
 
     function setLoading(btn, textWhileLoading) {
@@ -176,7 +176,6 @@
     function disableForm(form, on) {
       [...form.elements].forEach(el => el.disabled = on);
     }
-    /* -------------------------------------------------------------------------- */
 
     function verzenden(event) {
       event.preventDefault();
@@ -193,17 +192,18 @@
       const form = event.target;
       const submitBtn = document.getElementById('submitButton');
 
-      // UI in laad-stand
+      /* BELANGRIJK: eerst de FormData maken (velden nog NIET disabled) */
+      const formData = new FormData(form);
+      formData.append('tijd', new Date().toLocaleString());
+
+      /* Dan pas UI in laad-stand en formulier tijdelijk uitschakelen */
       isVersturenBezig = true;
       setLoading(submitBtn, "Bezig met inchecken…");
       disableForm(form, true);
 
-      const formData = new FormData(form);
-      formData.append('tijd', new Date().toLocaleString());
-
-      // Optionele timeout: 10s
+      // Optionele timeout (20s) voor Apps Script
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
 
       fetch("https://script.google.com/macros/s/AKfycbxEbGbyBtFYqIRO0Il59tXnXNv5o6rok89w27JBgQvh4loggjhX9Uh1_Ty_K32wXJUB/exec", {
         method: "POST",
@@ -212,6 +212,7 @@
       })
       .then(response => response.text())
       .then(text => {
+        console.log("Server antwoord:", text);
         if (text === "OK") {
           toonMelding("✅ Je bent ingecheckt. Dankjewel!", "success");
           localStorage.setItem("checkin_datum_skills_saskia", vandaag);
